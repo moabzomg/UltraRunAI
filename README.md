@@ -20,7 +20,7 @@ I named it UltraRunAI at a start.
 
 ## To-Do List
 
-- Web Scraping: Collects ultra-trail race data (distance, elevation, difficulty, themes, challenges).
+- Web Scraping: Collects ultra-trail race and runner data using Selenium.
 - Data Analysis: Identifies race trends and performance factors.
 - Machine Learning: Predicts race outcomes & recommends races based on runner profiles.
 - Data Visualisation: Displays charts & insights for better decision-making.
@@ -47,4 +47,3 @@ To display the React page in [localhost](http://localhost:3000/), simply execute
 npm install
 npm run start
 ```
-# UltraRunAI
