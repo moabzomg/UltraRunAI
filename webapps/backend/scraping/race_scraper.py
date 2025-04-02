@@ -1,22 +1,24 @@
 import requests
-from tqdm import tqdm
 from pathlib import Path
 import json
 from bs4 import BeautifulSoup
 from multiprocessing import Pool, Manager, cpu_count
 
 # Parameters
+MIN_RACE_UID = 2621
 MAX_RACE_UID = 100000
 YEAR_START = 2003
 YEAR_END = 2025
 RACE_JSON_PATH = "../../frontend/public/data/race.json"
-NUM_WORKERS = min(cpu_count(), 10) 
+NUM_PROCESSES = 4
+SAVE_RACE_DATA_EVERY = 500
+CHECK_DUPLICATE = False
 
 
 def get_meta_info(response):
     soup = BeautifulSoup(response.content, "html.parser")
     
-    # Initialize default values
+    # Initialise default values
     city_country = None
     date = None
     distance = None
@@ -62,6 +64,8 @@ def extract_race_results(soup, info):
         rank = cols[0].text.strip()
         time = cols[1].text.strip()
         name = cols[2].find("a").text.strip()
+        runner_link = cols[2].find("a")["href"] if cols[2].find("a") else None
+        runner_id = runner_link.split("/")[-1] if runner_link else None
         nationality = cols[3].text.strip().split()[-1] if cols[3].text.strip().split() else None
         age_category = cols[5].text.strip()
 
@@ -72,6 +76,7 @@ def extract_race_results(soup, info):
                 "Rank": int(rank),
                 "Time": time,
                 "Name": name,
+                "Id": runner_id,
                 "Nationality": nationality,
                 "Age": age_category,
             })
@@ -84,6 +89,8 @@ def fetch_race_data(race_uid, year):
 
     if response.status_code == 404:
         return None  # No race found
+    
+    print(f'race {race_uid} in {year} found')
 
     soup = BeautifulSoup(response.content, "html.parser")
 
@@ -100,9 +107,9 @@ def fetch_race_data(race_uid, year):
 def process_race_task(args):
     race_uid, year, existing_results = args
     utmb_key = f"{race_uid}.{year}"
-
-    if utmb_key in existing_results:
-        return utmb_key, None  # Skip already processed races
+    if CHECK_DUPLICATE:
+        if utmb_key in existing_results:
+            return utmb_key, None  # Skip already processed races
 
     race_data = fetch_race_data(race_uid, year)
     return utmb_key, race_data
@@ -122,16 +129,16 @@ def scrape_races_parallel():
         utmb_results = {}
 
     # Prepare task list
-    tasks = [(race_uid, year, utmb_results) for race_uid in range(MAX_RACE_UID) for year in range(YEAR_START, YEAR_END)]
+    tasks = [(race_uid, year, utmb_results) for race_uid in range(MIN_RACE_UID,MAX_RACE_UID) for year in range(YEAR_START, YEAR_END)]
     
-    with Pool(NUM_WORKERS) as pool:
-        for i, (utmb_key, race_data) in enumerate(tqdm(pool.imap_unordered(process_race_task, tasks), total=len(tasks))):
+    with Pool(NUM_PROCESSES) as pool:
+        for i, (utmb_key, race_data) in enumerate(pool.imap_unordered(process_race_task, tasks)):
             if race_data:
                 utmb_results[utmb_key] = race_data
 
-            # Save progress every 500 races
-            if i % 500 == 0:
+            if i % SAVE_RACE_DATA_EVERY == 0:         
                 save_progress(utmb_results)
+                print("JSON Saved")
 
     # Final save
     save_progress(utmb_results)

@@ -18,11 +18,109 @@ I named it UltraRunAI at a start.
 - **Flask (Backend API)**
 - **PostgreSQL (Database)**
 
+## **Web Scraping: Collecting Ultra-Trail Race and Runner Data Using Selenium**
+
+This project scrapes ultra-trail race and runner data using Selenium with a headless browser.
+
+### **Race Scraper (`race_scraper.py`)**
+
+- Extracts race data from `https://utmb.world/utmb-index/races/{id}..{year}?page={number}`.
+- `id` ranges from **1 to 100000**, and `year` ranges from **2003 to 2025**.
+- Uses **multiprocessing** to speed up scraping, though it may still take **days to weeks**, depending on CPU power.
+- Outputs data to:
+  - `webapps/frontend/public/data/race.json`
+- Includes details such as:
+  - **City/Country**, **Date**, **Distance**, **Elevation Gain**, and race **Results**
+  - Results include **Rank**, **Time** (DNF = Did Not Finish), **Name**, **Nationality** (some runners lack this), and **Age Category**
+- `UTMB Index` is **not extracted** due to login restrictions.
+- **Nationality Extraction:**
+  - Nationality is encoded in a CSS class like `fi-{XX}`, where `XX` is a **two-letter country code** (requires post-processing).
+
+---
+
+### **Runner Scraper (`runner_scraper.py`)**
+
+- Extracts all runners from the **[Runner Search Page](https://utmb.world/utmb-index/runner-search/)**.
+- There are currently **230,000+ pages**, each listing **14 runners**, making this a **long-running process**.
+- Uses **incremental JSON updates** to prevent crashes, allowing resumption from the last scraped `runner_id`.
+- Outputs data to:
+  - **Runner IDs:** `webapps/frontend/public/data/runner_id.json`
+  - **Runner Profiles:** `webapps/frontend/public/data/runner.json`
+
+---
+
+### ** Configuration Parameters**
+
+Customise these values in the script for different scraping needs:
+
+| Parameter                                                   | Description                                                                                                                                                   |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MAXIMUM_RETRY`                                             | Retries fetching a page **every 2 seconds** if a `503 Service Temporarily Unavailable` error occurs (usually recovers in ~5 retries).                         |
+| `MIN_RACE_UID`, `MAX_RACE_UID`                              | Defines the **UTMB Race ID range** (usually ≤100000).                                                                                                         |
+| `YEAR_START`, `YEAR_END`                                    | Filters races by year.                                                                                                                                        |
+| `TOP_N_RUNNERS`                                             | Number of runners to extract, starting from the **highest UTMB Index**.                                                                                       |
+| `DATA_DIR`                                                  | Directory where scraped data is stored.                                                                                                                       |
+| `RACE_JSON_PATH`, `RUNNER_JSON_PATH`, `RUNNER_ID_JSON_PATH` | Paths for race, runner, and runner ID JSON files.                                                                                                             |
+| `CHROME_DRIVER_PATH`                                        | Path to the Chrome WebDriver (typically in the working directory).                                                                                            |
+| `NUM_WORKERS`                                               | Number of parallel processes for multiprocessing.                                                                                                             |
+| `SAVE_RUNNER_ID_EVERY_PAGES`                                | Interval (in pages) for saving **runner IDs** to JSON.                                                                                                        |
+| `SAVE_RUNNER_DATA_EVERY`                                    | Interval (in profiles) for saving **runner data** to JSON.                                                                                                    |
+| `SAVE_RACE_DATA_EVERY`                                      | Interval (in races) for saving **race data** to JSON.                                                                                                         |
+| `UPDATE_RUNNER_PROFILE_ONLY`                                | If `True`, extracts only **runner profiles** from `RUNNER_ID_JSON_PATH` without re-scraping IDs.                                                              |
+| `CHECK_DUPLICATE`                                           | If `False`, fetch all available race data without checking if it exists in the json file already will reduce computational time for creating a new json file. |
+
+---
+
+### ** Important Notes**
+
+**Handling Sleep Mode & Crashes:**
+
+- `race_scraper.py` **automatically resumes** if the computer sleeps and wakes up.
+- `runner_scraper.py` **does NOT resume** because the **headless browser terminates** upon sleep.
+
+  **Recovering from Corrupt JSON Files:**
+
+- If a JSON file **fails to load**, it may be corrupted.
+- Open the JSON with `vi`, append new data manually (`Shift + G` to go to the end), and **fix syntax errors**.
+- If necessary, **empty the file** and start fresh.
+
+  **Resuming Scraping Manually:**
+
+- **For `race_scraper.py`**:
+  - Set `MIN_RACE_UID` to the last extracted **race ID** before the crash.
+- **For `runner_scraper.py`**:
+  - Modify `RUNNER_ID_JSON_PATH` to remove already-scraped IDs.
+  - Use `cp -p runner_id.json temp.json` to create a backup, then **remove completed runners**.
+  - Set `UPDATE_RUNNER_PROFILE_ONLY = False` to **re-extract missing profiles**.
+
+# Data Cleaning Script
+
+This script cleans JSON data files by removing duplicate keys in dictionaries and duplicate values in arrays.
+
+## Features
+
+- Removes duplicate keys in `race.json` and `runner.json`, keeping only the last occurrence.
+- Removes duplicate values in `runner_id.json`.
+- Saves cleaned data to new files with `cleaned_` prefix.
+
+## File Paths
+
+| Original File    | Cleaned Output File      |
+| ---------------- | ------------------------ |
+| `race.json`      | `cleaned_race.json`      |
+| `runner.json`    | `cleaned_runner.json`    |
+| `runner_id.json` | `cleaned_runner_id.json` |
+
+## Usage
+
+1. Ensure the JSON files are located in `../../frontend/public/data/`.
+2. Run the script using Python:
+   ```bash
+   python clean_data.py
+   ```
+
 ## To-Do List
 
-- Web Scraping: Collects ultra-trail race and runner data using Selenium with headless browser.
-  - `Race_scraper.py` extracts all races using the url https://utmb.world/utmb-index/races/{id}..{year}?page={number}, where `id` ranges from 1 to 100000, `year` ranges from 2003 to 2025, using loops with multiprocessing technique to save computational time, which may takes several days to weeks, depending your CPU. The result will output to `webapps/frontend/public/data/race.json` with information including `City/Country`, `Date`, `Distance`, `Elevation Gain` and a list of `Results` with `Rank`, `Time` (**DNF** means did not finish the race), `Name`, `Nationality` (There are some runners do not have nationality) and `Age Category`. `UTMB Index` is not extracted since login is required.
-  - `Runner_scraper.py` extracts all runners in the page [Runner Search](https://utmb.world/utmb-index/runner-search/), by finding all runner IDs in the available pages. At the moment, there are more than 230000 pages with each page 14 runners, you can imagine the runtime of the python program. Therefore, json is updated at intervals to prevent crashes, so that we can continue scraping from the last scraped runner_id or runner profile. The list of runner IDs json will output to `webapps/frontend/public/data/runner_id.json` and the runner profile json will output to `webapps/frontend/public/data/runner.json`, with all available information. For the nationality, we can extract it with the class name, which is fi-{XX}, represented by 2 alphabets, which required further processing.
 - Data Analysis: Identifies race trends and performance factors.
 - Machine Learning: Predicts race outcomes & recommends races based on runner profiles.
 - Data Visualisation: Displays charts & insights for better decision-making.
