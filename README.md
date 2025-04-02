@@ -12,7 +12,7 @@ I named it UltraRunAI at a start.
 
 ## Technologies Planned to Use
 
-- **Python (Scrapy, Selenium, BeautifulSoup, Pandas, Scikit-Learn)**
+- **Python (Selenium, BeautifulSoup, Pandas, Scikit-Learn)**
 - **Machine Learning (Regression, Clustering, Recommendation Systems)**
 - **React + TailwindCSS + HighchartJS + LeafletJS (Frontend UI)**
 - **Flask (Backend API)**
@@ -20,7 +20,9 @@ I named it UltraRunAI at a start.
 
 ## To-Do List
 
-- Web Scraping: Collects ultra-trail race and runner data using Selenium.
+- Web Scraping: Collects ultra-trail race and runner data using Selenium with headless browser.
+  - `Race_scraper.py` extracts all races using the url https://utmb.world/utmb-index/races/{id}..{year}?page={number}, where `id` ranges from 1 to 100000, `year` ranges from 2003 to 2025, using loops with multiprocessing technique to save computational time, which may takes several days to weeks, depending your CPU. The result will output to `webapps/frontend/public/data/race.json` with information including `City/Country`, `Date`, `Distance`, `Elevation Gain` and a list of `Results` with `Rank`, `Time` (**DNF** means did not finish the race), `Name`, `Nationality` (There are some runners do not have nationality) and `Age Category`. `UTMB Index` is not extracted since login is required.
+  - `Runner_scraper.py` extracts all runners in the page [Runner Search](https://utmb.world/utmb-index/runner-search/), by finding all runner IDs in the available pages. At the moment, there are more than 230000 pages with each page 14 runners, you can imagine the runtime of the python program. Therefore, json is updated at intervals to prevent crashes, so that we can continue scraping from the last scraped runner_id or runner profile. The list of runner IDs json will output to `webapps/frontend/public/data/runner_id.json` and the runner profile json will output to `webapps/frontend/public/data/runner.json`, with all available information. For the nationality, we can extract it with the class name, which is fi-{XX}, represented by 2 alphabets, which required further processing.
 - Data Analysis: Identifies race trends and performance factors.
 - Machine Learning: Predicts race outcomes & recommends races based on runner profiles.
 - Data Visualisation: Displays charts & insights for better decision-making.
