@@ -5,11 +5,11 @@ from bs4 import BeautifulSoup
 from multiprocessing import Pool, Manager, cpu_count
 
 # Parameters
-MIN_RACE_UID = 2621
+MIN_RACE_UID = 2759
 MAX_RACE_UID = 100000
 YEAR_START = 2003
 YEAR_END = 2025
-RACE_JSON_PATH = "../../frontend/public/data/race.json"
+RACE_JSON_PATH = "../../frontend/public/data/raw_race_data/race.json"
 NUM_PROCESSES = 4
 SAVE_RACE_DATA_EVERY = 500
 CHECK_DUPLICATE = False

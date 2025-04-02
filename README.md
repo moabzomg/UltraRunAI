@@ -28,7 +28,7 @@ This project scrapes ultra-trail race and runner data using Selenium with a head
 - `id` ranges from **1 to 100000**, and `year` ranges from **2003 to 2025**.
 - Uses **multiprocessing** to speed up scraping, though it may still take **days to weeks**, depending on CPU power.
 - Outputs data to:
-  - `webapps/frontend/public/data/race.json`
+  - `webapps/frontend/public/data/raw_race_data/race.json`
 - Includes details such as:
   - **City/Country**, **Date**, **Distance**, **Elevation Gain**, and race **Results**
   - Results include **Rank**, **Time** (DNF = Did Not Finish), **Name**, **Nationality** (some runners lack this), and **Age Category**
@@ -44,8 +44,8 @@ This project scrapes ultra-trail race and runner data using Selenium with a head
 - There are currently **230,000+ pages**, each listing **14 runners**, making this a **long-running process**.
 - Uses **incremental JSON updates** to prevent crashes, allowing resumption from the last scraped `runner_id`.
 - Outputs data to:
-  - **Runner IDs:** `webapps/frontend/public/data/runner_id.json`
-  - **Runner Profiles:** `webapps/frontend/public/data/runner.json`
+  - **Runner IDs:** `webapps/frontend/public/data/raw_runner_id_data/runner_id.json`
+  - **Runner Profiles:** `webapps/frontend/public/data/raw_runner_data/runner.json`
 
 ---
 
@@ -99,25 +99,13 @@ This script cleans JSON data files by removing duplicate keys in dictionaries an
 
 ## Features
 
+- Concatenate a list of json for `race.json`, `runner.json`, `runner_id.json` inside their raw data folders respectively.
 - Removes duplicate keys in `race.json` and `runner.json`, keeping only the last occurrence.
 - Removes duplicate values in `runner_id.json`.
+- Ranks runners by:
+  - **General UTMB Index** (higher value is better).
+  - **Total of 20K, 50K, 100K, and 100M UTMB Index values** (higher total is better).
 - Saves cleaned data to new files with `cleaned_` prefix.
-
-## File Paths
-
-| Original File    | Cleaned Output File      |
-| ---------------- | ------------------------ |
-| `race.json`      | `cleaned_race.json`      |
-| `runner.json`    | `cleaned_runner.json`    |
-| `runner_id.json` | `cleaned_runner_id.json` |
-
-## Usage
-
-1. Ensure the JSON files are located in `../../frontend/public/data/`.
-2. Run the script using Python:
-   ```bash
-   python clean_data.py
-   ```
 
 ## To-Do List
 

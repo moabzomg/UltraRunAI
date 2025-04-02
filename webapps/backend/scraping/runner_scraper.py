@@ -12,9 +12,8 @@ from bs4 import BeautifulSoup
 
 # Configuration
 BASE_URL = "https://utmb.world/utmb-index/runner-search"
-DATA_DIR = "../../frontend/public/data/"
-RUNNER_JSON_PATH = os.path.join(DATA_DIR, "runner.json")
-RUNNER_ID_JSON_PATH = os.path.join(DATA_DIR, "runner_id.json")
+RUNNER_JSON_PATH = os.path.join("../../frontend/public/data/raw_runner_data", "runner.json")
+RUNNER_ID_JSON_PATH = os.path.join("../../frontend/public/data/raw_runner_id_data", "runner_id.json")
 CHROME_DRIVER_PATH = "./chromedriver"
 TOP_N_RUNNERS = 1000000  # Number of runners to scrape
 MAX_RETRIES = 100  # Maximum retry attempts for 503 errors
