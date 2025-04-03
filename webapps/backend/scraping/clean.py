@@ -1,37 +1,34 @@
 import json
 import os
+import glob
+import shutil
+
 
 DATA_DIR = "../../frontend/public/data/"
-RACE_JSON_DIR = os.path.join(DATA_DIR, "raw_race_data/")
-RUNNER_JSON_DIR = os.path.join(DATA_DIR, "raw_runner_data/")
-RUNNER_ID_JSON_DIR = os.path.join(DATA_DIR, "raw_runner_id_data/")
+RACE_JSON_DIR = os.path.join(DATA_DIR, "raw_race/")
+RUNNER_JSON_DIR = os.path.join(DATA_DIR, "raw_runner/")
+RUNNER_ID_JSON_DIR = os.path.join(DATA_DIR, "raw_runner_id/")
 CLEANED_RACE_JSON_PATH = os.path.join(DATA_DIR, "cleaned_race.json")
 CLEANED_RUNNER_JSON_PATH = os.path.join(DATA_DIR, "cleaned_runner.json")
 CLEANED_RUNNER_ID_JSON_PATH = os.path.join(DATA_DIR, "cleaned_runner_id.json")
 
 
-def load_json_from_directory(directory_path):
-    all_data = []
+def load_json_from_directory(directory_path,initialise):
+    all_data = initialise
     # Iterate over each file in the directory
     for filename in os.listdir(directory_path):
         if filename.endswith(".json"):
             file_path = os.path.join(directory_path, filename)
             with open(file_path, "r") as file:
-                data = json.load(file)
-                all_data.extend(data)  # Extend list with data from the current file
-    return all_data
-
-
-def load_json_as_dict_from_directory(directory_path):
-    all_data = {}
-    # Iterate over each file in the directory
-    for filename in os.listdir(directory_path):
-        if filename.endswith(".json"):
-            file_path = os.path.join(directory_path, filename)
-            with open(file_path, "r") as file:
-                data = json.load(file)
-                # Merge data into the all_data dictionary
-                all_data.update(data)  # Ensure it's merged with race_id as the key
+                try: 
+                    data = json.load(file)
+                    if type(initialise) is list: # for runner and runner_id json list
+                        all_data.extend(data) 
+                    else: # for race json dict
+                         all_data.update(data)
+                    print(f"json in {file_path} extracted")
+                except ValueError as e:
+                    print (f"Error in file {file_path}:{e}")
     return all_data
 
 
@@ -41,7 +38,7 @@ def save_json(file_path, data):
 
 
 # --- Clean and Rank RUNNER_JSON ---
-runners_data = load_json_from_directory(RUNNER_JSON_DIR)
+runners_data = load_json_from_directory(RUNNER_JSON_DIR,[])
 
 # Remove duplicates, keeping the last occurrence
 cleaned_data = {runner["id"]: runner for runner in runners_data}.values()
@@ -66,7 +63,7 @@ print(f"Ranked and cleaned runner data saved to '{CLEANED_RUNNER_JSON_PATH}'.")
 
 
 # --- Clean RACE_JSON ---
-races_data = load_json_as_dict_from_directory(RACE_JSON_DIR)
+races_data = load_json_from_directory(RACE_JSON_DIR,{})
 
 # Clean by keeping only the last occurrence of each race ID
 cleaned_race_data = {race_id: race_data for race_id, race_data in races_data.items()}
@@ -76,10 +73,20 @@ print(f"Ranked and cleaned race data saved to '{CLEANED_RACE_JSON_PATH}'.")
 
 
 # --- Clean and Deduplicate RUNNER_ID_JSON ---
-runner_ids_data = load_json_from_directory(RUNNER_ID_JSON_DIR)
+runner_ids_data = load_json_from_directory(RUNNER_ID_JSON_DIR,[])
 
 # Remove duplicates, keeping only the last occurrence of each ID
 unique_runner_ids = list(dict.fromkeys(runner_ids_data))
 
 save_json(CLEANED_RUNNER_ID_JSON_PATH, unique_runner_ids)
 print(f"Cleaned runner IDs saved to '{CLEANED_RUNNER_ID_JSON_PATH}'.")
+
+
+for dir,cleaned_file in zip([RACE_JSON_DIR,RUNNER_JSON_DIR,RUNNER_ID_JSON_DIR],[CLEANED_RACE_JSON_PATH,CLEANED_RUNNER_JSON_PATH,CLEANED_RUNNER_ID_JSON_PATH]):
+    files = glob.glob(dir+'/*')
+    for f in files:
+        os.remove(f)
+    print(f"Raw data in {dir} removed.")
+    shutil.copy2(cleaned_file,dir)
+    print(f"{cleaned_file} copied to {dir}")
+        
