@@ -237,17 +237,17 @@ docker-compose run scraper python3 webapps/backend/scraping/clean.py
 
 ### 8. Notes
 
-#### 💤 Sleep Mode & Crashes
+#### Sleep Mode & Crashes
 
 - `race_scraper.py` resumes automatically after interruption.
 - `runner_scraper.py` should be restarted manually with the appropriate chunk.
 
-#### ⚠️ Corrupt JSON Files
+#### Corrupt JSON Files
 
 - Use `vi`, `nano`, or `jq` to inspect and fix.
 - If unrecoverable, delete and rerun that segment.
 
-#### 🔁 Resuming Scraping
+#### Resuming Scraping
 
 - Use `--min_race_uid` and `--year_start` to resume `race_scraper.py`.
 - Rerun individual split files with `runner_scraper.py`.
@@ -332,31 +332,3 @@ to your `docker-compose` commands.
 - Race Difficulty Prediction Model
 - Coach-Runner Matching System
 - Real-time Race Tracking
-
-## How to Use
-
-### Backend
-
-```
-
-pip3 install -r requirements.txt
-python3 app.py
-
-```
-
-, the script will set up the environment and start the Flask server to start the backend.
-
-### Frontend
-
-To display the React page in [localhost](http://localhost:3000/), simply execute
-
-```
-
-npm install
-npm run start
-
-```
-
-```
-
-```
