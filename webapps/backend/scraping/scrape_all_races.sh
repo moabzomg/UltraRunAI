@@ -3,7 +3,7 @@
 # Define range for race UID
 MIN_RACE_UID=1
 MAX_RACE_UID=100000
-STEP=5000
+STEP=2000
 
 # Loop through the range and run race_scraper.py in batches
 for ((start=$MIN_RACE_UID; start<=$MAX_RACE_UID; start+=$STEP))

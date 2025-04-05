@@ -6,6 +6,12 @@ import argparse
 from bs4 import BeautifulSoup
 from multiprocessing import Pool, cpu_count
 import datetime
+import time
+
+import re
+def solve(s):   # solve date                                          
+    return re.sub(r'(\d)(st|nd|rd|th)', r'\1', s)
+
 
 # Default parameters
 DEFAULT_MIN_RACE_UID = 1
@@ -13,7 +19,7 @@ DEFAULT_MAX_RACE_UID = 100000
 DEFAULT_YEAR_START = 2003
 DEFAULT_YEAR_END = datetime.datetime.now().year
 DATA_DIR = "../../frontend/public/data"
-NUM_PROCESSES = 20
+NUM_PROCESSES = 4
 
 
 def get_meta_info(response):
@@ -43,11 +49,11 @@ def get_meta_info(response):
         elevation_gain = elevation_gain_elem.find_next("span").text.strip()
 
     return {
-        "City/Country": city_country,
-        "Date": date,
-        "Distance": distance,
-        "Elevation Gain": elevation_gain,
-        "Results": []
+        "C": city_country,
+        "Date": datetime.datetime.strptime(solve(date), "%d %B %Y").strftime("%Y%m%d"),
+        "Dist": distance.split(" ")[0],
+        "Ele": elevation_gain.split(" ")[0],
+        "Res": []
     }
 
 
@@ -59,7 +65,7 @@ def extract_race_results(soup, info):
         if len(cols) < 6:
             continue
 
-        rank = cols[0].text.strip()
+        rank = cols[0].text.strip() 
         time = cols[1].text.strip()
         name = cols[2].find("a").text.strip()
         runner_link = cols[2].find("a")["href"] if cols[2].find("a") else None
@@ -68,38 +74,40 @@ def extract_race_results(soup, info):
         age_category = cols[5].text.strip()
 
         if rank == "DNF":
-            info["Results"].append({"Name": name, "Time": "DNF", "Nationality": nationality, "Age": age_category})
+            info["Res"].append({"N": name, "T": "DNF", "Nat": nationality, "Age": age_category})
         else:
-            info["Results"].append({
-                "Rank": int(rank),
-                "Time": time,
-                "Name": name,
+            info["Res"].append({
+                "Rk": int(rank),
+                "T": time,
+                "N": name,
                 "Id": runner_id,
-                "Nationality": nationality,
+                "Nat": nationality,
                 "Age": age_category,
             })
 
 
 def fetch_race_data(race_uid, year):
-    """Fetch and parse race data."""
     url = f'https://utmb.world/utmb-index/races/{race_uid}..{year}'
-    response = requests.get(url)
+    while True:
+        response = requests.get(url)
 
-    if response.status_code == 404:
-        return None  # No race found
-
-    print(f'Race {race_uid} in {year} found')
-
-    soup = BeautifulSoup(response.content, "html.parser")
-
-    # Extract race info on first page
-    info = get_meta_info(response)
-    if not all([info["City/Country"], info["Date"], info["Distance"], info["Elevation Gain"]]):
-        return None  # Return None if essential elements are missing
-
-    extract_race_results(soup, info)
-
-    return info if info["Results"] else None  # Only return if results exist
+        if response.status_code == 503:
+            wait_time = 0.1
+            time.sleep(wait_time)
+            continue  # Retry the request
+        
+        if response.status_code != 200:
+            return None  # Stop retrying for other errors
+        
+        soup = BeautifulSoup(response.content, "html.parser")
+        # Extract race info on first page
+        info = get_meta_info(response)
+        if not all([info["C"], info["Date"], info["Dist"], info["Ele"]]):
+            return None  # Return None if essential elements are missing
+        
+        print(f'Race {race_uid} in {year} found')
+        extract_race_results(soup, info)
+        return info if info["Res"] else None  # Only return if results exist
 
 
 def process_race_task(args):
@@ -111,23 +119,25 @@ def process_race_task(args):
 
 def save_progress(utmb_results, race_json_path):
     with open(race_json_path, 'w') as f:
-        json.dump(utmb_results, f, indent=4)
-
+        json.dump(utmb_results, f, separators=(",", ":"))
 
 def scrape_races(min_race_uid, max_race_uid, year_start, year_end):
     utmb_results = {}
 
     # Prepare task list
-    tasks = [(race_uid, year) for race_uid in range(min_race_uid, max_race_uid) for year in range(year_start, year_end)]
+    tasks = [(race_uid, year) for race_uid in range(min_race_uid, max_race_uid+1) for year in range(year_start, year_end)]
 
-    with Pool(NUM_PROCESSES) as pool:
-        for i, (utmb_key, race_data) in enumerate(pool.imap_unordered(process_race_task, tasks)):
-            if race_data:
-                utmb_results[utmb_key] = race_data
+    for race_uid, year in tasks:
+        utmb_key, race_data = process_race_task((race_uid, year))
+        if race_data:
+            utmb_results[utmb_key] = race_data
+
     # Final save
     save_progress(utmb_results, RACE_JSON_PATH)
-    print(f"JSON saved up to {utmb_key}")
-
+    if utmb_results:
+        print(f"JSON saved to {RACE_JSON_PATH}")
+    else:
+        print("Nothing scraped.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Scrape UTMB race results.")

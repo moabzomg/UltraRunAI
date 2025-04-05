@@ -3,6 +3,7 @@ import sys
 import os
 import multiprocessing
 import datetime
+import re
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -18,8 +19,7 @@ BASE_URL = "https://utmb.world/utmb-index/runner-search"
 DATA_DIR = "../../frontend/public/data"
 RUNNER_JSON_PATH = os.path.join(DATA_DIR, "raw_runner",f'runner_{datetime.datetime.now():%Y%m%d%H%M%S}.json')
 CHROME_DRIVER_PATH = "./chromedriver"
-MAX_RETRIES = 100  # Maximum retry attempts for 503 errors
-NUM_PROCESSES = 20  # Number of parallel processes for runner profile scraping
+NUM_PROCESSES = 4  # Number of parallel processes for runner profile scraping
 
 
 def setup_browser():
@@ -34,12 +34,12 @@ def setup_browser():
 def save_data(file_path, data):
     """Save data to a JSON file."""
     with open(file_path, "w") as file:
-        json.dump(data, file, indent=4)
+        json.dump(data, file, separators=(",", ":"))
 
 
-def get_page_with_retries(driver, url, max_retries=MAX_RETRIES):
+def get_page_with_retries(driver, url):
     """Attempt to load a webpage multiple times in case of 503 errors."""
-    for attempt in range(1, max_retries + 1):
+    while True:
         try:
             driver.get(url)
             WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
@@ -47,9 +47,7 @@ def get_page_with_retries(driver, url, max_retries=MAX_RETRIES):
                 raise WebDriverException("503 Service Unavailable")
             return True  # Successfully loaded
         except (TimeoutException, WebDriverException) as e:
-            print(f"[Retry {attempt}/{max_retries}] Failed to load {url}: {e}")
-    print(f"Error: Unable to load {url} after {max_retries} retries.")
-    return False  # Failed after max retries
+            print(f"Failed to load {url}: {e}, retrying...")
 
 
 def scrape_runner_profile(runner_id):
@@ -85,6 +83,7 @@ def scrape_runner_profile(runner_id):
     # Extract club and sponsor details
     club, sponsor = None, None
     details = soup.select(".runner-more-details_details_element__3rIxF")
+    races = []
     for detail in details:
         title_element = detail.select_one(".runner-more-details_details_title__RIv1N")
         content_element = detail.select_one(".runner-more-details_details_content__ZiSil")
@@ -95,6 +94,35 @@ def scrape_runner_profile(runner_id):
                 club = content
             elif title == "Sponsor(s)":
                 sponsor = content
+                
+    # Extract Race Details
+        race_rows = soup.select(".my-table_row__nlm_j")
+        for row in race_rows:
+            cols = row.select(".my-table_cell__z__zN")
+            if len(cols) >= 8:
+                # Extract country
+                country_element = cols[2].select_one("span[class^='results-table_flag__']")
+                country = next((cls.split("-")[-1].upper() for cls in country_element["class"] if cls.startswith("fi-")), None)
+
+                # Extract race category
+                category_element = row.select_one(".pi-category-logo_container__1zLvC img")
+                category = category_element["alt"] if category_element else None
+                race_uid = ""
+                link = cols[1].select_one("a.link_link__96ppl")
+                if link and link.has_attr("href"):
+                    match = re.search(r"/races/(\d+)\..*?(\d{4})", link["href"])
+                    if match:
+                        race_uid = match.group(1) + ".." +  match.group(2)
+                
+                year = cols[0].text.strip().split(" ")[-1]  # Extract the year
+
+                races.append({
+                    "Id": race_uid,
+                    "cat": category,
+                    "time": cols[5].text.strip(),
+                    "rk": cols[6].text.strip().split(" ")[0], # total rank
+                    "grk": cols[7].text.strip().split(" ")[0], # gender rank
+                })
 
     driver.quit()
     print(f"Scraped runner: {runner_id}")
@@ -104,12 +132,13 @@ def scrape_runner_profile(runner_id):
         key: value
         for key, value in {
             "id": runner_id,
-            "name": name,
-            "age_group": age_group,
-            "nationality": nationality,
-            "UTMB Index": utmb_indexes,
-            "club": club,
-            "sponsor": sponsor,
+            "n": name,
+            "age": age_group,
+            "nat": nationality,
+            "I": utmb_indexes,
+            "c": club,
+            "s": sponsor,
+            "r": races
         }.items()
         if value
     }

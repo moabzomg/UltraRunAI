@@ -1,3 +1,4 @@
+
 import json
 import os
 import glob
@@ -81,12 +82,4 @@ unique_runner_ids = list(dict.fromkeys(runner_ids_data))
 save_json(CLEANED_RUNNER_ID_JSON_PATH, unique_runner_ids)
 print(f"Cleaned runner IDs saved to '{CLEANED_RUNNER_ID_JSON_PATH}'.")
 
-
-for dir,cleaned_file in zip([RACE_JSON_DIR,RUNNER_JSON_DIR,RUNNER_ID_JSON_DIR],[CLEANED_RACE_JSON_PATH,CLEANED_RUNNER_JSON_PATH,CLEANED_RUNNER_ID_JSON_PATH]):
-    files = glob.glob(dir+'/*')
-    for f in files:
-        os.remove(f)
-    print(f"Raw data in {dir} removed.")
-    shutil.copy2(cleaned_file,dir)
-    print(f"{cleaned_file} copied to {dir}")
         

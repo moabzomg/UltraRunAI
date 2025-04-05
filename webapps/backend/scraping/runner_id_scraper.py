@@ -16,7 +16,6 @@ BASE_URL = "https://utmb.world/utmb-index/runner-search"
 DATA_DIR = "../../frontend/public/data"
 RUNNER_ID_JSON_PATH = os.path.join(DATA_DIR, "raw_runner_id", f'runner_id_{datetime.datetime.now():%Y%m%d%H%M%S}.json')
 CHROME_DRIVER_PATH = "./chromedriver"
-MAX_RETRIES = 100  # Maximum retry attempts for 503 errors
 NUM_PAGES = None  # Will be set by command-line argument
 
 
@@ -32,13 +31,13 @@ def setup_browser():
 def save_data(file_path, data):
     """Save the given data to a JSON file."""
     with open(file_path, "w") as file:
-        json.dump(data, file, indent=4)
+        json.dump(data, file, separators=(",", ":"))
 
 
-def get_page_with_retries(driver, url, max_retries=MAX_RETRIES):
+def get_page_with_retries(driver, url):
     """Attempt to load a webpage, retrying if a 503 error occurs."""
     attempt = 0
-    while attempt < max_retries:
+    while True:
         try:
             driver.get(url)
             WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
@@ -49,8 +48,6 @@ def get_page_with_retries(driver, url, max_retries=MAX_RETRIES):
             print(f"Attempt {attempt + 1}: Error loading {url} - {e}")
             attempt += 1
 
-    print(f"Failed to load {url} after {max_retries} retries.")
-    return False  # Failed after max retries
 
 
 def get_max_pages(driver):
@@ -103,27 +100,30 @@ def scrape_runner_ids(num_pages):
     print(f"Scraping up to {num_pages} pages (Max available: {max_pages})")
 
     for current_page in range(1, num_pages + 1):
-        print(f"Scraping Page {current_page}/{num_pages}")
+        runner_ids = []
+        while len(runner_ids) == 0:
+            print(f"Scraping Page {current_page}/{num_pages}")
+            try:
+                # Wait for the current page to load
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, f"a[aria-label='Page {current_page} is your current page']"))
+                )
+                # Extract runner IDs from the page
+                runner_ids = extract_runner_ids(driver)
+                all_runner_ids.extend(runner_ids)
 
-        # Wait for the current page to load
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, f"a[aria-label='Page {current_page} is your current page']"))
-        )
-
-        # Extract runner IDs from the page
-        runner_ids = extract_runner_ids(driver)
-        all_runner_ids.extend(runner_ids)
-
-        print(f"Found {len(runner_ids)} runners on page {current_page}")
-
-        # Click 'Next' if available
-        next_button = driver.find_elements(By.CSS_SELECTOR, "a[rel='next']")
-        if next_button and next_button[0].get_attribute("aria-disabled") != "true":
-            driver.execute_script("arguments[0].click();", next_button[0])
-        else:
-            print("No more pages to scrape.")
-            break
-
+                
+                if len(runner_ids) > 0:
+                    print(f"Found {len(runner_ids)} runners on page {current_page}")
+                    # Click 'Next' if available
+                    next_button = driver.find_elements(By.CSS_SELECTOR, "a[rel='next']")
+                    if next_button and next_button[0].get_attribute("aria-disabled") != "true":
+                        driver.execute_script("arguments[0].click();", next_button[0])
+                    else:
+                        print("No more pages to scrape.")
+                        break
+            except (TimeoutException, WebDriverException) as e:
+                print(f"Error on page {current_page}: {e}. Retrying...")
     driver.quit()
     save_data(RUNNER_ID_JSON_PATH, all_runner_ids)
     print(f"Scraping completed. Total runners collected: {len(all_runner_ids)}")

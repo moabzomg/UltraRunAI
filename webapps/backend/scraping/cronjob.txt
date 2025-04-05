@@ -1,0 +1,11 @@
+# Run runner_scraper.py monthly on the 1st at 2 AM
+0 2 1 * * root python3 /app/runner_scraper.py /data/cleaned_runner_id.json >> /app/logs/runner_scraper.log 2>&1
+
+# Run runner_id_scraper.py every 6 months (Jan, Jul) on the 1st at 3 AM
+0 3 1 1,7 * root python3 /app/runner_id_scraper.py >> /app/logs/runner_id_scraper.log 2>&1
+
+# Run race_scraper.py every Sunday at 4 AM
+0 4 * * 0 root /app/scrape_races_cron.sh >> /app/logs/race_scraper.log 2>&1
+
+# Run cleanup + clean.py after all scrapers, 5 AM every Sunday
+0 5 * * 0 root /app/cleanup_and_clean.sh >> /app/logs/cleaner.log 2>&1
