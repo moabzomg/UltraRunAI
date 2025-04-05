@@ -1,0 +1,13 @@
+# Ignore node modules and frontend build artifacts
+frontend/node_modules
+frontend/public
+frontend/dist
+
+# Ignore __pycache__, logs, etc.
+**/__pycache__/
+**/*.pyc
+backend/scraping/logs
+
+# Git and Mac-specific files
+.git
+.DS_Store

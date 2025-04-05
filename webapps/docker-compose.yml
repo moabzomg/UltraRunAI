@@ -1,0 +1,29 @@
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - php
+
+  php:
+    image: php:8.2-apache
+    ports:
+      - "8080:80"
+    volumes:
+      - ./backend/php:/var/www/html
+      - ./frontend/public/data:/var/www/html/data
+    depends_on:
+      - scraper
+
+  scraper:
+    build:
+      context: .  
+      dockerfile: backend/scraping/dockerfile
+    volumes:
+      - ./frontend/public/data:/data
+
