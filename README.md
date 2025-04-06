@@ -201,11 +201,11 @@ This will:
 
 ---
 
-### 7. Docker Containerization
+## 7. Docker Containerization
 
 Run the scraper using Docker for better isolation and reproducibility.
 
-#### Step 1: Build the Docker images
+### Step 1: Build Docker Images
 
 From the root of the project (where `docker-compose.yml` is located), run:
 
@@ -213,96 +213,130 @@ From the root of the project (where `docker-compose.yml` is located), run:
 docker-compose build
 ```
 
-This will build all the necessary images, including the scraper.
+This will build all necessary images, including the scraper.
 
-#### Step 2: Run any scraper
+### Step 2: Run Scraper Scripts
 
-The easiest way to run the scraper is via Docker Compose. Docker Compose will manage dependencies and the execution environment for you.
-
-To run the scraper (e.g., `runner_id_scraper.py`), use the following command:
+To run the `runner_id_scraper.py` (with automatic resume on crash):
 
 ```bash
 docker-compose run scraper python3 webapps/backend/scraping/runner_id_scraper.py "max"
 ```
 
-To run `clean.py`:
+To run the race scraper:
+
+```bash
+docker-compose run scraper python3 webapps/backend/scraping/race_scraper.py --min_race_uid 1 --max_race_uid 100000 --year_start 2025 --year_end <current year>
+```
+
+To clean the data:
 
 ```bash
 docker-compose run scraper python3 webapps/backend/scraping/clean.py
 ```
 
-> You can mount ChromeDriver and the raw data directory into the container as needed.
+> You can mount `chromedriver` and the raw data directory into the container as needed.
 
 ---
 
-### 8. Notes
+## 8. Resuming Scraping
 
-#### Sleep Mode & Crashes
+### Runner ID Scraper (`runner_id_scraper.py`)
 
-- `race_scraper.py` resumes automatically after interruption.
-- `runner_scraper.py` should be restarted manually with the appropriate chunk.
+- This script **automatically resumes** after a crash.
+- If the browser crashes:
+  - It saves all runner IDs collected up to that point.
+  - It stores the last successfully scraped runner ID in memory.
+  - It opens a new browser instance, clicks "Next" repeatedly until it finds that ID, and resumes scraping from there.
 
-#### Corrupt JSON Files
+No manual intervention is needed.
 
-- Use `vi`, `nano`, or `jq` to inspect and fix.
+### Race Scraper (`race_scraper.py`)
+
+- Resume using command-line options:
+  - `--min_race_uid`: Set starting race ID
+  - `--year_start`: Resume from a specific year
+
+Example:
+
+```bash
+docker-compose run scraper python3 webapps/backend/scraping/race_scraper.py --min_race_uid 88000 --year_start 2024
+```
+
+### Runner Scraper (`runner_scraper.py`)
+
+- Resume manually by running the script on an individual chunk file:
+
+```bash
+docker-compose run scraper python3 /app/runner_scraper.py /data/cleaned_runner_id_chunk_03.json
+```
+
+---
+
+## 9. Handling Errors and Crashes
+
+### Sleep Mode and Browser Crashes
+
+- Use `caffeinate` on macOS to prevent sleep during long runs:
+
+```bash
+caffeinate -i python3 runner_scraper.py ...
+```
+
+### Corrupt JSON Files
+
+- Use tools like `jq`, `vi`, or `nano` to inspect.
 - If unrecoverable, delete and rerun that segment.
 
-#### Resuming Scraping
-
-- Use `--min_race_uid` and `--year_start` to resume `race_scraper.py`.
-- Rerun individual split files with `runner_scraper.py`.
-
 ---
 
-### 9. Updating the Data
+## 10. Updating the Data
 
 To update just the current year's race results:
 
 ```bash
 rm webapps/frontend/public/data/raw_race_data/*
 cp -p webapps/frontend/public/data/cleaned_race.json webapps/frontend/public/data/raw_race_data/
-python3 race_scraper.py --min_race_uid 1 --max_race_uid 100000 --year_start 2025 --year_end <current year>
-python3 clean.py
+
+python3 webapps/backend/scraping/race_scraper.py --min_race_uid 1 --max_race_uid 100000 --year_start 2025 --year_end <current year>
+python3 webapps/backend/scraping/clean.py
 ```
 
 ---
 
-### 10. Runtime and Optimisation
+## 11. Scheduled Maintenance Scripts
 
-- `race_scraper.py` uses multiprocessing for speed.
-- Runner data is chunked to reduce memory usage and risk of crash.
-- Keep your Mac awake during scraping using:
+### Cron Scripts
 
-```bash
-caffeinate -i python3 runner_scraper.py ...
-```
+A script named `cron.sh` handles scheduled tasks like:
 
----
+- Backup
+- Cleanup
+- Raw data folder maintenance
+- Data cleaning
 
-### 11. Scheduled Cleanup Script
+Located in `webapps/backend/scraping/`.
 
-The `cron.sh` script performs backup, runs the cleaner, and manages raw data folders. It is intended to be run automatically as part of the scheduled maintenance tasks.
+### Cron Jobs Definition
 
-#### Cron Jobs
-
-The `cronjob.txt` file defines the scraping schedule, including:
+The `cronjob.txt` file defines the scraping schedule:
 
 - Monthly runner data scraping
 - Biannual runner ID scraping
 - Weekly race scraping
-- Weekly cleanup and data processing
+- Weekly cleanup
 
-Both files are located in `backend/scraping/`.
+---
 
-#### Docker Usage
+## 12. Common Docker Usage
 
-To run the cleanup script inside the `scraper` container:
+Run cleanup script inside the scraper container:
 
 ```bash
 docker-compose run scraper bash /app/cron.sh
 ```
 
-To test individual scraper scripts:
+Run individual scripts:
 
 ```bash
 docker-compose run scraper python3 /app/runner_scraper.py /data/cleaned_runner_id.json
@@ -310,19 +344,17 @@ docker-compose run scraper python3 /app/runner_id_scraper.py
 docker-compose run scraper bash /app/scrape_races_cron.sh
 ```
 
-To execute the full weekly cleanup and clean-up logic:
+Run full weekly pipeline:
 
 ```bash
 docker-compose run scraper bash /app/cleanup_and_clean.sh
 ```
 
-To avoid orphan containers, you can add:
+To avoid orphan containers:
 
 ```bash
---remove-orphans
+docker-compose run --remove-orphans ...
 ```
-
-to your `docker-compose` commands.
 
 ## To-Do List
 
