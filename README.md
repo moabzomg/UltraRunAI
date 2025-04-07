@@ -246,10 +246,12 @@ docker-compose run scraper python3 webapps/backend/scraping/clean.py
 - This script **automatically resumes** after a crash.
 - If the browser crashes:
   - It saves all runner IDs collected up to that point.
-  - It stores the last successfully scraped runner ID in memory.
-  - It opens a new browser instance, clicks "Next" repeatedly until it finds that ID, and resumes scraping from there.
-
-No manual intervention is needed.
+  - It stores the last successfully scraped runner ID and the page number in memory.
+  - It opens a new browser instance, clicks "Next" repeatedly until it finds that ID, and resumes scraping from there, assuming the runner does
+  - To manually start from a particular runner Id and page, modify the initial parameter in the function
+  ```
+  def resume_scraping(num_pages, resume_from_runner_id=None, last_page_scraped=1):
+  ```
 
 ### Race Scraper (`race_scraper.py`)
 

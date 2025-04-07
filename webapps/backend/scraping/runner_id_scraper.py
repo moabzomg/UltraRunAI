@@ -58,27 +58,41 @@ def extract_runner_ids(driver):
     return runner_ids
 
 
-def find_resume_page(driver, last_runner_id):
+def find_resume_page(driver, last_runner_id, last_page_scraped):
     """Navigate pages until last runner ID is found."""
     page = 1
+
+    # Fast forward to last scraped page
+    while page < last_page_scraped:
+        next_button = driver.find_elements(By.CSS_SELECTOR, "a[rel='next']")
+        if not next_button or next_button[0].get_attribute("aria-disabled") == "true":
+            print(f"Cannot reach last scraped page {last_page_scraped}.")
+            return None
+        driver.execute_script("arguments[0].click();", next_button[0])
+        page += 1
+        print(f"Skipping to page {page}")
+
     while True:
         print(f"Searching for last runner ID '{last_runner_id}' on page {page}...")
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".my-table_row__nlm_j")))
         ids = extract_runner_ids(driver)
+        if not ids:
+            print(f"No runner IDs found on page {page}, retrying...")
+            continue
+
         if last_runner_id in ids:
             print(f"Found last runner ID on page {page}. Resuming from here.")
-            return True
+            return page
 
         next_button = driver.find_elements(By.CSS_SELECTOR, "a[rel='next']")
         if not next_button or next_button[0].get_attribute("aria-disabled") == "true":
             print("Reached end of pages but last ID not found.")
-            return False
+            return None
 
         driver.execute_script("arguments[0].click();", next_button[0])
         page += 1
 
-
-def resume_scraping(num_pages, resume_from_runner_id=None):
+def resume_scraping(num_pages, resume_from_runner_id=None, last_page_scraped=1):
     all_runner_ids = []
     last_runner_id = resume_from_runner_id
     found_resume_point = not bool(resume_from_runner_id)
@@ -99,10 +113,12 @@ def resume_scraping(num_pages, resume_from_runner_id=None):
         current_page = 1
 
         if last_runner_id:
-            found_resume_point = find_resume_page(driver, last_runner_id)
-            if not found_resume_point:
+            page_found = find_resume_page(driver, last_runner_id, last_page_scraped)
+            if not page_found:
                 driver.quit()
                 return
+            else:
+                current_page = page_found
 
         while current_page <= max_pages:
             runner_ids = []
@@ -116,12 +132,9 @@ def resume_scraping(num_pages, resume_from_runner_id=None):
                     if len(runner_ids) == 0:
                         print(f"Retrying page {current_page} due to empty content.")
                 except (TimeoutException, WebDriverException) as e:
-                    print(f"Error on page {current_page}: {e}. Retrying...")
+                    print(f"Error on page {current_page}: {e}. Reloading browser")
+                    break
 
-            if last_runner_id and last_runner_id in runner_ids:
-                index = runner_ids.index(last_runner_id)
-                runner_ids = runner_ids[index + 1:]
-                print(f"Skipping already scraped runner ID '{last_runner_id}'")
 
             all_runner_ids.extend(runner_ids)
             if runner_ids:
@@ -147,8 +160,7 @@ def resume_scraping(num_pages, resume_from_runner_id=None):
 
         # Resume after crash
         if all_runner_ids:
-            resume_scraping(num_pages, resume_from_runner_id=all_runner_ids[-1])
-
+            resume_scraping(num_pages, resume_from_runner_id=all_runner_ids[-1], last_page_scraped=current_page - 1)
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:

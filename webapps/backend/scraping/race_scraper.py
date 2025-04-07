@@ -37,6 +37,10 @@ def get_meta_info(response):
     date_elem = soup.find("p", string="Date")
     if date_elem:
         date = date_elem.find_next("span").text.strip()
+        try:
+            date_str = datetime.datetime.strptime(solve(date), "%d %B %Y").strftime("%Y%m%d")
+        except (ValueError, TypeError):
+            date_str = None
 
     # Extract Distance
     distance_elem = soup.find("p", string="Distance")
@@ -50,7 +54,7 @@ def get_meta_info(response):
 
     return {
         "C": city_country,
-        "Date": datetime.datetime.strptime(solve(date), "%d %B %Y").strftime("%Y%m%d"),
+        "Date": date_str,
         "Dist": distance.split(" ")[0],
         "Ele": elevation_gain.split(" ")[0],
         "Res": []
@@ -100,6 +104,7 @@ def fetch_race_data(race_uid, year):
             return None  # Stop retrying for other errors
         
         soup = BeautifulSoup(response.content, "html.parser")
+        print(race_uid,year)
         # Extract race info on first page
         info = get_meta_info(response)
         if not all([info["C"], info["Date"], info["Dist"], info["Ele"]]):
